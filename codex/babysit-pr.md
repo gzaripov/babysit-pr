@@ -13,6 +13,23 @@ Substitute the user's package manager runner (`pnpm dlx`, `yarn dlx`, `bunx`) fo
 
 ## Phase 1: Initial sweep
 
+### Step 0: Ensure the PR is mergeable
+
+Before touching CI or comments, confirm the PR is not conflicting with its base branch. A stale base can cause CI to pass on obsolete code or block merge even after every check is green.
+
+Run `gh pr view --json mergeable,mergeStateStatus,baseRefName`.
+
+- **`mergeable: MERGEABLE`** → go to Step 1.
+- **`mergeable: UNKNOWN`** → GitHub has not computed mergeability yet. Wait ~5s and re-check (retry up to 3 times before escalating).
+- **`mergeable: CONFLICTING`** or **`mergeStateStatus: DIRTY`** → rebase:
+  1. `git fetch origin <baseRefName>`
+  2. `git rebase origin/<baseRefName>`
+  3. If conflicts arise during the rebase:
+     - Trivial / mechanical conflicts (lockfile regeneration, import re-ordering, adjacent edits to separate symbols): resolve and `git rebase --continue`.
+     - Non-trivial conflicts (overlapping logic changes, schema/API changes, anything requiring product judgement): run `git rebase --abort` and ask the user.
+  4. After a clean rebase, push with `git push --force-with-lease` — never plain `--force`.
+  5. Re-run `gh pr view --json mergeable` to confirm the PR is now clean before proceeding.
+
 ### Step 1: Resolve existing bot comments
 
 Fetch unanswered bot comments with `npx agent-reviews --bots-only --unanswered --expanded`. For each comment:
@@ -63,10 +80,11 @@ Run `npx agent-reviews --watch --bots-only` and wait for it to exit (default 10 
 
 ### Step 6: Final CI sanity check
 
-Run `gh pr checks` once more. Intermediate commits may have kicked off a new run.
+Run `gh pr checks` once more. Intermediate commits may have kicked off a new run. Also re-check `gh pr view --json mergeable` — the base may have moved during the watch window.
 
-- **All green** → Summary report. Done.
-- **Anything else** → back to Step 2.
+- **All green and mergeable** → Summary report. Done.
+- **Check failing or pending** → back to Step 2.
+- **Conflicting with base** → back to Step 0.
 
 ## Summary report
 
@@ -87,4 +105,4 @@ Bail out and ask the user when:
 - A failure requires judgement outside the scope of the PR.
 - The user has not authorized pushing to this branch, or the branch is protected.
 
-Do not use destructive git operations (force push, reset --hard) to work around a check.
+Do not use destructive git operations to work around a failure. `git push --force-with-lease` is acceptable after a legitimate rebase in Step 0; plain `git push --force`, `git reset --hard`, and history rewrites intended to hide a failing check are not.

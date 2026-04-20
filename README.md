@@ -8,12 +8,13 @@ It builds on top of [`agent-reviews`](https://github.com/pbakaus/agent-reviews) 
 
 ## What it does
 
-On each iteration, the skill alternates between two signals and fixes whatever is broken:
+On each iteration, the skill alternates between three signals and fixes whatever is broken:
 
-1. **CI checks** — polled via `gh pr checks` / `gh pr checks --watch`. Failing runs have their logs fetched with `gh run view --log-failed`, the code is fixed, and the fix is committed and pushed.
-2. **Bot review comments** — watched via `npx agent-reviews --watch --bots-only`. New findings from Cursor Bugbot, Copilot, CodeRabbit, etc. are evaluated, fixed (or dismissed), committed, and replied to.
+1. **Mergeability** — checked via `gh pr view --json mergeable`. If the PR is conflicting with its base, the skill rebases onto `origin/<base>`, resolves trivial conflicts (lockfiles, import order, adjacent edits), and force-pushes with `--force-with-lease`. Non-trivial conflicts are escalated to you.
+2. **CI checks** — polled via `gh pr checks` / `gh pr checks --watch`. Failing runs have their logs fetched with `gh run view --log-failed`, the code is fixed, and the fix is committed and pushed.
+3. **Bot review comments** — watched via `npx agent-reviews --watch --bots-only`. New findings from Cursor Bugbot, Copilot, CodeRabbit, etc. are evaluated, fixed (or dismissed), committed, and replied to.
 
-It terminates only when both signals are clean at the same time. It also has stopping rules (e.g., same check failing 3× in a row) so it asks for help instead of looping forever on a misdiagnosis.
+It terminates only when all three signals are clean at the same time. It also has stopping rules (e.g., same check failing 3× in a row, non-trivial rebase conflicts) so it asks for help instead of looping forever on a misdiagnosis.
 
 ## Prerequisites (all tools)
 
@@ -112,17 +113,73 @@ It asks for input when uncertain (architectural changes, unclear failures, the s
 
 ## Updating
 
-```bash
-# Claude Code
-cd ~/.claude/skills/babysit-pr && git pull
+The skill is a handful of plain text files; updating means pulling the newest copy into the install path for your tool. Pick the command that matches how you installed it.
 
-# Cursor
+### Check what you have installed
+
+```bash
+# Claude Code (user-level clone)
+git -C ~/.claude/skills/babysit-pr log -1 --format="%h %s (%cr)"
+
+# Cursor / Codex (single-file copies — compare against the repo)
+diff -q ~/.cursor/rules/babysit-pr.mdc   <(curl -fsSL https://raw.githubusercontent.com/gzaripov/babysit-pr/main/cursor/babysit-pr.mdc)
+diff -q ~/.codex/prompts/babysit-pr.md   <(curl -fsSL https://raw.githubusercontent.com/gzaripov/babysit-pr/main/codex/babysit-pr.md)
+```
+
+`diff -q` prints nothing if the file is already up to date.
+
+### Pull the latest
+
+```bash
+# Claude Code — user-level (cloned via git)
+cd ~/.claude/skills/babysit-pr && git pull --ff-only
+
+# Claude Code — project-level (cloned via git)
+cd .claude/skills/babysit-pr && git pull --ff-only
+
+# Cursor — user-level
 curl -fsSL https://raw.githubusercontent.com/gzaripov/babysit-pr/main/cursor/babysit-pr.mdc \
   -o ~/.cursor/rules/babysit-pr.mdc
 
-# Codex
+# Cursor — project-level
+curl -fsSL https://raw.githubusercontent.com/gzaripov/babysit-pr/main/cursor/babysit-pr.mdc \
+  -o .cursor/rules/babysit-pr.mdc
+
+# Codex CLI
 curl -fsSL https://raw.githubusercontent.com/gzaripov/babysit-pr/main/codex/babysit-pr.md \
   -o ~/.codex/prompts/babysit-pr.md
+```
+
+### After updating
+
+- **Claude Code:** start a new session (or run `/reload` in an existing one) — skills are loaded at startup.
+- **Cursor:** reload the Cursor window (`Cmd/Ctrl+Shift+P` → "Reload Window") so the rule is re-read.
+- **Codex CLI:** restart `codex` — prompts are read on launch.
+
+### If you edited the local copy
+
+`git pull` will refuse to overwrite local changes. If you intentionally customized your copy:
+
+```bash
+cd ~/.claude/skills/babysit-pr
+git stash              # save your edits
+git pull --ff-only
+git stash pop          # replay your edits on top of the new version
+```
+
+For the Cursor / Codex single-file installs, copy your local file aside before re-running `curl`.
+
+### Pinning to a version
+
+If you want to lock to a specific commit (e.g., after verifying it in CI):
+
+```bash
+# Claude Code
+cd ~/.claude/skills/babysit-pr && git checkout <commit-sha>
+
+# Cursor / Codex — point curl at a tag or commit instead of main
+curl -fsSL https://raw.githubusercontent.com/gzaripov/babysit-pr/<sha>/cursor/babysit-pr.mdc \
+  -o ~/.cursor/rules/babysit-pr.mdc
 ```
 
 ## Uninstalling
