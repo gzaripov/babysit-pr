@@ -40,7 +40,49 @@ The body of each file is the same workflow; only the frontmatter and install loc
 
 ## Installation
 
-### Claude Code
+### Recommended: `skills add`
+
+The easiest way is via the [`skills`](https://github.com/vercel-labs/skills) CLI (from Vercel Labs), which installs the skill into the correct directory for whichever agent you target. Use whichever package-manager runner you prefer — all four work identically:
+
+```bash
+# npm
+npx skills add gzaripov/babysit-pr -a claude-code -g
+
+# bun
+bunx skills add gzaripov/babysit-pr -a claude-code -g
+
+# yarn
+yarn dlx skills add gzaripov/babysit-pr -a claude-code -g
+
+# pnpm
+pnpm dlx skills add gzaripov/babysit-pr -a claude-code -g
+```
+
+Swap `-a claude-code` for `-a cursor` or `-a codex`, combine multiple agents in one command, or drop `-g` for a project-local install:
+
+```bash
+# Cursor (global)
+npx skills add gzaripov/babysit-pr -a cursor -g
+
+# Codex CLI (global)
+npx skills add gzaripov/babysit-pr -a codex -g
+
+# All three at once
+npx skills add gzaripov/babysit-pr -a claude-code -a cursor -a codex -g
+
+# Project-level (installs into the current repo instead of ~/)
+npx skills add gzaripov/babysit-pr -a claude-code
+```
+
+Add `-y` for non-interactive mode, and see `<runner> skills add --help` for the full flag list. The rest of this README uses `npx` for brevity — substitute `bunx`, `yarn dlx`, or `pnpm dlx` as appropriate.
+
+> **Note:** `skills add` follows the [Agent Skills specification](https://github.com/vercel-labs/skills) and installs the raw `SKILL.md` into each agent's skills directory (`~/.claude/skills/`, `~/.cursor/skills/`, `~/.codex/skills/`). Claude Code reads this path natively. Cursor and Codex CLI today natively look at `.cursor/rules/*.mdc` and `~/.codex/prompts/*.md` respectively — so if the CLI install doesn't get picked up by your version of those tools, fall back to the manual install below, which places the per-agent files in the documented native locations.
+
+### Manual install
+
+For users who would rather not depend on `npx skills`, or who want the skill in each agent's native extension path:
+
+#### Claude Code
 
 User-level (available in every project):
 
@@ -56,7 +98,7 @@ git clone https://github.com/gzaripov/babysit-pr.git .claude/skills/babysit-pr
 
 Claude Code picks up `SKILL.md` the next time it starts. Invoke with `/babysit-pr` or by asking naturally (“babysit this PR”).
 
-### Cursor
+#### Cursor
 
 User-level (available in every workspace):
 
@@ -76,7 +118,7 @@ curl -fsSL https://raw.githubusercontent.com/gzaripov/babysit-pr/main/cursor/bab
 
 The rule has `alwaysApply: false`, so it only loads when relevant. Ask the Cursor Agent to "babysit this PR" to invoke it; you can also `@`-mention the rule to pull it into context explicitly.
 
-### OpenAI Codex CLI
+#### OpenAI Codex CLI
 
 Install as a custom prompt — it becomes a `/babysit-pr` slash command in the Codex REPL:
 
@@ -115,7 +157,19 @@ It asks for input when uncertain (architectural changes, unclear failures, the s
 
 The skill is a handful of plain text files; updating means pulling the newest copy into the install path for your tool. Pick the command that matches how you installed it.
 
-### Check what you have installed
+### If you installed via `skills add` (recommended)
+
+```bash
+# npm / bun / yarn / pnpm — pick one
+npx       skills update gzaripov/babysit-pr
+bunx      skills update gzaripov/babysit-pr
+yarn dlx  skills update gzaripov/babysit-pr
+pnpm dlx  skills update gzaripov/babysit-pr
+```
+
+Run `npx skills list` (or the equivalent runner) to see what's currently installed and which agents it's installed for.
+
+### Check what you have installed (manual installs)
 
 ```bash
 # Claude Code (user-level clone)
@@ -183,6 +237,18 @@ curl -fsSL https://raw.githubusercontent.com/gzaripov/babysit-pr/<sha>/cursor/ba
 ```
 
 ## Uninstalling
+
+If you installed via `skills add`:
+
+```bash
+# npm / bun / yarn / pnpm
+npx       skills remove gzaripov/babysit-pr
+bunx      skills remove gzaripov/babysit-pr
+yarn dlx  skills remove gzaripov/babysit-pr
+pnpm dlx  skills remove gzaripov/babysit-pr
+```
+
+For manual installs:
 
 ```bash
 rm -rf ~/.claude/skills/babysit-pr
